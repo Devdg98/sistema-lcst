@@ -1,5 +1,5 @@
 <template>
-  <v-app-bar color="#002D18" dark dense flat scroll-behavior="hide">
+  <v-app-bar color="#000000" dark dense flat scroll-behavior="hide">
 
     <!-- Ícone de menu para mobile -->
     <v-app-bar-nav-icon class="d-sm-none" @click.stop="drawer = !drawer" />

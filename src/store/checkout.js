@@ -1,8 +1,16 @@
-// src/stores/checkout.js
+// stores/checkout.js
 import { defineStore } from 'pinia'
 import axios from 'axios'
-import { useCarrinhoStore } from './carrinho'
 import { useAuthStore } from './auth'
+
+const toMoney = (v, def = 0) => {
+  const n = Number(v)
+  return Number.isFinite(n) ? n : def
+}
+const toPrazoOrNull = (v) => {
+  const n = Number(v)
+  return Number.isFinite(n) && Math.trunc(n) >= 1 ? Math.trunc(n) : null
+}
 
 export const useCheckoutStore = defineStore('checkout', {
   state: () => ({
@@ -13,53 +21,74 @@ export const useCheckoutStore = defineStore('checkout', {
   }),
 
   actions: {
-    async iniciarCheckout() {
-      this.loading = true;
-      this.erro = null;
+    async iniciarCheckout({ itens, cotacao, endereco, total }) {
+      this.loading = true
+      this.erro = null
 
-      const carrinhoStore = useCarrinhoStore();
-      const authStore = useAuthStore();
+      const authStore = useAuthStore()
 
       if (!authStore.estaLogado) {
-        this.erro = 'Você precisa estar logado para finalizar a compra.';
-        this.loading = false;
-        return;
+        this.erro = 'Você precisa estar logado para finalizar a compra.'
+        this.loading = false
+        return
       }
 
       try {
-        const itens = carrinhoStore.itens.map(item => ({
-          produto: item.produto,
-          quantidade: item.quantidade,
-          valorUnitario: item.produto.valorProduto,
-          cor: item.cor,
-          tamanho: item.tamanho
-        }));
+        // ===== normalizações coerentes com o controller =====
+        const freteValor   = toMoney(cotacao?.valor ?? cotacao?.price ?? 0)
+        const freteServico = String(cotacao?.service || cotacao?.servico || 'Entrega')
+        const freteCarrier = String(cotacao?.carrier || 'Transportadora')
+        const fretePrazo   = toPrazoOrNull(cotacao?.prazo) // só envia se >= 1
+
+        // formato esperado pelo controller
+        const itensController = (itens || []).map(i => ({
+          produto: i?.produto || {}, // snapshot do produto
+          quantidade: toMoney(i?.quantidade ?? 1, 1),
+          valorUnitario: toMoney(i?.valorUnitario ?? i?.produto?.valorProduto ?? 0),
+          cor: i?.cor,
+          tamanho: i?.tamanho
+        }))
+
+        // payload compatível com o controller
+        const fretePayload = {
+          valor: freteValor,
+          servico: freteServico,
+          carrier: freteCarrier,
+          ...(fretePrazo !== null ? { prazo: fretePrazo } : {}) // << inclui prazo só se válido
+        }
+
+        const payload = {
+          itens: itensController,
+          frete: fretePayload,
+          // o controller atual não usa 'endereco' nem 'valorTotal', mas não atrapalha enviar:
+          endereco,
+          valorTotal: toMoney(total || 0)
+        }
+
+        // diagnóstico (remova em produção se quiser)
+        console.log('[checkout] payload.frete =>', payload.frete)
 
         const { data } = await axios.post(
           'https://backendgeral-147424face7e.herokuapp.com/pagamento/criar-preferencia',
-          { itens },
-          {
-            headers: {
-              Authorization: `Bearer ${authStore.token}`
-            }
-          }
-        );
+          payload,
+          { headers: { Authorization: `Bearer ${authStore.token}` } }
+        )
 
-        this.initPoint = data.init_point || null;
-        this.pedidoId = data.pedidoId || null;
+        this.initPoint = data.init_point || data.initPoint || null
+        this.pedidoId  = data.pedidoId || null
 
-        if (!this.initPoint) {
-          this.erro = 'Erro ao iniciar pagamento.';
+        if (this.initPoint) {
+          window.location.href = this.initPoint
         } else {
-          // opcional: limpar carrinho aqui ou após confirmação do webhook
-          // carrinhoStore.limparCarrinho();
+          this.erro = 'Erro ao iniciar pagamento.'
         }
       } catch (err) {
-        console.error('Erro ao iniciar checkout:', err.response?.data || err.message);
-        this.erro = err.response?.data?.mensagem || 'Erro ao iniciar checkout. Tente novamente.';
+        const apiMsg = err?.response?.data?.mensagem || err?.response?.data?.message
+        console.error('Erro ao iniciar checkout:', err?.response?.data || err?.message)
+        this.erro = apiMsg || 'Erro ao iniciar checkout. Tente novamente.'
       } finally {
-        this.loading = false;
+        this.loading = false
       }
     }
   }
-});
+})

@@ -7,7 +7,7 @@
   </v-app-bar>
 
   <!-- AppBar 2: Logo à esquerda / Ícones à direita -->
-  <v-app-bar color="#002D18" class="custom-app-bar-2 mt-n6" flat>
+  <v-app-bar color="#000000" class="custom-app-bar-2 mt-n6" flat>
     <!-- Logo à esquerda -->
     <router-link to="/">
 <v-avatar
@@ -41,7 +41,7 @@
       <v-icon color="white">mdi-account-outline</v-icon>
     </v-btn>
   </template>
-  <v-toolbar class="toolbar" flat color="#002D18">
+  <v-toolbar class="toolbar" flat color="#000000">
       <v-toolbar-title class="text-h6">Login / Cadastro </v-toolbar-title>
       <v-spacer />
       <v-btn icon @click="loginModel = false">
@@ -91,7 +91,7 @@
   <v-list-item
     class="pa-2 mt-6"
     link
-    color="#002D18"
+    color="#000000"
     to="/consultarEncomenda"
     @click="loginModel = false"
   >
@@ -163,13 +163,13 @@
     v-model="buscaAberta"
     class="mt-n8 "
     location="left"
-    color="#002D18"
+    color="#000000"
     :width="700"
     temporary
     elevation="0" style="height: 100%; display: flex; flex-direction: column;"
   >
   <v-card class="rounded-0">
-  <v-toolbar color="#002D18">
+  <v-toolbar color="#000000">
     <v-text-field
       v-model="termoBusca"
       placeholder="Digite o nome do produto"
@@ -201,7 +201,7 @@
   <v-card-subtitle class="tituloBusca pa-0">
     {{ quantidadeFiltrados }} produto{{ quantidadeFiltrados === 1 ? '' : 's' }} encontrado{{ quantidadeFiltrados === 1 ? '' : 's' }}
   </v-card-subtitle>
-  <v-divider class="divider-end" color="#002D18"/>
+  <v-divider class="divider-end" color="#000000"/>
 
 
     <v-row class="mt-4">
@@ -247,7 +247,7 @@
 <v-navigation-drawer
   v-model="menuAberto"
   location="right"
-  color="#002D18"
+  color="#000000"
   width="600"
   
   class="mt-n8"
@@ -257,7 +257,7 @@
 
 <v-tabs
   v-model="tab"
-  bg-color="#002D18"
+  bg-color="#000000"
   class="text-white"
   @update:model-value="categoriaAberta = false"
 >
@@ -277,7 +277,7 @@
         :key="categoria"
         class="pa-2"
         link
-        color="#002D18"
+        color="#000000"
         @click="abrirCategoria(categoria)"
       >
         <v-list-item-title class="btn-menu">{{ categoria.toUpperCase() }}</v-list-item-title>
@@ -300,7 +300,7 @@
       </v-list-item>
 
       <v-divider />
-      <v-list-item class="pa-2 mt-2" link color="#002D18" to="/consultarEncomenda" >
+      <v-list-item class="pa-2 mt-2" link color="#000000" to="/consultarEncomenda" >
       <v-list-item-title class="btn-menu"><v-icon class="mr-2">mdi-truck</v-icon>Consultar a Encomenda</v-list-item-title>
 
       <template #append>
@@ -330,7 +330,7 @@
         :key="categoria"
         class="pa-2"
         link
-        color="#002D18"
+        color="#000000"
         @click="abrirCategoria(categoria)"
       >
         <v-list-item-title class="btn-menu">{{ categoria.toUpperCase() }}</v-list-item-title>
@@ -354,7 +354,7 @@
 </v-list-item>
 
 <v-divider />
-<v-list-item class="pa-2 mt-2" link color="#002D18" to="/consultarEncomenda" >
+<v-list-item class="pa-2 mt-2" link color="#000000" to="/consultarEncomenda" >
 <v-list-item-title class="btn-menu"><v-icon class="mr-2">mdi-truck</v-icon>Consultar a Encomenda</v-list-item-title>
 
 <template #append>
@@ -384,7 +384,7 @@
 <v-navigation-drawer
   v-model="categoriaAberta"
   location="right"
-  color="#002D18"
+  color="#000000"
   width="600"
   temporary
   
@@ -392,7 +392,7 @@
   :key="gavetaAtiva"
 >
 
-  <v-toolbar flat color="#002D18">
+  <v-toolbar flat color="#000000">
     <v-btn icon @click="categoriaAberta = false">
       <v-icon>mdi-arrow-left</v-icon>
     </v-btn>
@@ -631,30 +631,30 @@ calcularDesconto(precoFinal, precoOriginal) {
 }
 .botaolacoste2{
   background-color: #ffffff !important;
-  color: #002D18 !important;
+  color: #000000 !important;
   font-weight: 400;
   font-size: 10px;
   border-radius: 0 !important;
 }
 .botaolacoste {
-  background-color: #002D18 !important;
+  background-color: #000000 !important;
   color: white !important;
   font-weight: 500;
   font-size: 14px;
   border-radius: 0 !important;
 }
 .toolbar {
-  border: 1px solid #002D18; /* Borda cinza clara */
+  border: 1px solid #000000; /* Borda cinza clara */
   background-color: #fff; /* Fundo branco sólido */
 }
 .toolbar2 {
-  border: 1px solid #002D18; /* Borda cinza clara */
+  border: 1px solid #000000; /* Borda cinza clara */
   background-color: #fff; /* Fundo branco sólido */
 }
 .custom-app-bar-1 {
   min-height: 40px !important;
   height: 40px !important;
-  color: #002D18;
+  color: #000000;
   font-size: 16px;
   display: flex;
   justify-content: center;
@@ -677,13 +677,13 @@ calcularDesconto(precoFinal, precoOriginal) {
     text-decoration:underline; 
 }
 .rota-texto3 {
-  color:#002D18;
+  color:#000000;
   font-size: 16px;
   font-weight:300;
    text-decoration:underline; /* Remove a linha de sublinhado */
 }
 .rota-texto2 {
-  color:#002D18;
+  color:#000000;
   font-size: 18px;
   font-weight:400;
    text-decoration:underline; /* Remove a linha de sublinhado */
@@ -708,7 +708,7 @@ calcularDesconto(precoFinal, precoOriginal) {
 }
 .titulo {
   font-size: 24px;
-  color: #002D18;
+  color: #000000;
   font-weight: 400;
   text-transform: uppercase;
 }
@@ -726,17 +726,17 @@ calcularDesconto(precoFinal, precoOriginal) {
 
 .textosProduto {
   font-size: 14px;
-  color: #002D18;
+  color: #000000;
   font-weight: 500;
 }
 .descricaoTitulo {
   font-size: 12px;
-  color: #002D18;
+  color: #000000;
   font-weight: 400;
 }
 .tituloBusca {
   font-size: 20px;
-  color: #002D18;
+  color: #000000;
   font-weight: 400;
   text-transform: uppercase;
 }
@@ -763,23 +763,23 @@ calcularDesconto(precoFinal, precoOriginal) {
 }
 .titulo-model {
   font-size: 18px;
-  color: #002D18;
+  color: #000000;
   font-weight: 400;
   text-transform: uppercase;
 }
 .loginModel {
   font-size: 16px;
-  color: #002D18;
+  color: #000000;
   font-weight: 500;
 }
 .login2Model {
   font-size: 16px;
-  color: #002D18;
+  color: #000000;
   font-weight: 400;
 }
 .btnloginmodel {
   font-size: 16px;
-  background-color: #002D18;
+  background-color: #000000;
   color: white;
   font-weight: 500;
 }

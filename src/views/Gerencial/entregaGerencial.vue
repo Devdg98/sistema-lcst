@@ -1,493 +1,325 @@
+<!-- src/views/Gerencial/fretesGerencial.vue -->
 <template>
-  <v-container>
-    <!-- Cabeçalho -->
-    <div class="d-flex align-center justify-space-between mb-4">
-      <h2>Gestão de Fretes</h2>
-      <div class="d-flex ga-2">
-        <v-btn :loading="freteStore.loading" @click="listarFretes" color="primary" variant="elevated">
-          <v-icon start>mdi-refresh</v-icon> Atualizar
-        </v-btn>
-        <v-btn color="success" @click="dialogCriar = true" variant="elevated">
-          <v-icon start>mdi-plus</v-icon> Nova Cotação
-        </v-btn>
-      </div>
+  <v-container fluid class="pa-3 bg-grey-lighten-5">
+    <div class="d-flex align-center mb-3">
+      <v-icon class="mr-2">mdi-truck</v-icon>
+      <h2 class="text-h5 font-weight-bold mr-2">Gerencial de Fretes</h2>
+
+      <v-spacer />
+
+      <v-text-field
+        v-model="q"
+        placeholder="Buscar por ID do frete, pedido, usuário, transportadora..."
+        prepend-inner-icon="mdi-magnify"
+        density="comfortable"
+        hide-details
+        class="mr-2"
+        style="max-width: 420px"
+        clearable
+      />
+
+      <v-btn color="primary" :loading="loading" @click="fetchFretes" :ripple="false">
+        <v-icon start>mdi-refresh</v-icon> Atualizar
+      </v-btn>
     </div>
 
-    <!-- Feedback de Erro -->
-    <v-alert
-      v-if="freteStore.error"
-      type="error"
-      class="mb-4"
-      variant="tonal"
-      closable
-    >
-      {{ freteStore.error }}
+    <v-alert v-if="errorMsg" type="error" variant="tonal" class="mb-3">
+      {{ errorMsg }}
     </v-alert>
 
-    <!-- Lista de Fretes -->
-    <v-skeleton-loader v-if="freteStore.loading && !freteStore.fretes.length" type="card" class="mb-4" />
-    <v-card
-      v-for="frete in freteStore.fretes"
-      :key="frete._id"
-      class="mb-4"
-      elevation="1"
-    >
-      <v-card-title class="d-flex align-center justify-space-between">
-        <div class="d-flex align-center ga-3">
-          <v-chip :color="statusColor(frete.status)" size="small" text-color="white">
-            {{ frete.status || 'cotado' }}
-          </v-chip>
-          <span class="text-subtitle-1">ID: {{ frete._id }}</span>
-        </div>
+    <v-card class="elevation-1">
+      <v-data-table
+        :headers="headers"
+        :items="filtered"
+        :loading="loading"
+        item-key="_id"
+        density="comfortable"
+      >
+        <template v-slot:[`item._id`]="{ item }">
+          <v-tooltip :text="item._id">
+            <template #activator="{ props }">
+              <span v-bind="props">#{{ item._id.slice(-6) }}</span>
+            </template>
+          </v-tooltip>
+        </template>
 
-        <!-- Botões Desktop -->
-        <div class="d-none d-sm-flex ga-2">
+        <template v-slot:[`item.usuario`] ="{ item }">
+          <div class="text-body-2">
+            <strong>{{ item.usuario?.nome || '—' }}</strong>
+            <div class="text-caption">{{ item.usuario?.email }}</div>
+          </div>
+        </template>
+
+        <template v-slot:[`item.valor`]="{ item }">
+          {{ formatCurrency(item?.cotacaoSelecionada?.valor ?? 0) }}
+        </template>
+
+        <template v-slot:[`item.prazo`]="{ item }">
+          <span v-if="item?.cotacaoSelecionada?.prazo">{{ item.cotacaoSelecionada.prazo }} dia(s)</span>
+          <span v-else>—</span>
+        </template>
+
+        <template v-slot:[`item.service`]="{ item }">
+          <div class="text-caption">
+            <strong>{{ item?.cotacaoSelecionada?.carrier || item?.frete?.carrier || '—' }}</strong><br>
+            <span class="text-grey">{{ item?.cotacaoSelecionada?.service || item?.service || '—' }}</span>
+          </div>
+        </template>
+
+        <template v-slot:[`item.createdAt`]="{ item }">
+          {{ formatDate(item.createdAt) }}
+        </template>
+
+        <template v-slot:[`item.actions`]="{ item }">
           <v-btn
-  v-if="!frete.etiquetaId"
-  size="small"
-  color="primary"
-  :disabled="!frete.cotacaoSelecionada || freteStore.carregando"
-  @click="gerarEtiqueta(frete)"
->
-  <v-icon start>mdi-label-outline</v-icon>
-  Gerar Etiqueta
-</v-btn>
-
-
-          <v-btn
-            v-else
-            size="small"
-            color="success"
-            @click="abrirEtiqueta(frete)"
+            size="x-small"
+            variant="elevated"
+            color="primary"
+            class="mr-1"
+            :loading="busyId === 'print:'+item._id"
+            @click="imprimir(item)"
+            :ripple="false"
           >
-            <v-icon start>mdi-open-in-new</v-icon>
-            Abrir Etiqueta
+            <v-icon start size="16">mdi-printer</v-icon> Imprimir
           </v-btn>
 
           <v-btn
-            size="small"
+            size="x-small"
+            variant="outlined"
             color="error"
-            @click="cancelarFrete(frete._id)"
+            class="mr-1"
+            :disabled="!item.etiquetaId"
+            :loading="busyId === 'cancel:'+item._id"
+            @click="cancelar(item)"
+            :ripple="false"
           >
-            <v-icon start>mdi-cancel</v-icon>
-            Cancelar Frete
+            <v-icon start size="16">mdi-cancel</v-icon> Cancelar
           </v-btn>
+
           <v-btn
-            size="small"
-            color="info"
-            @click="frete._showDetalhes = !frete._showDetalhes"
+            size="x-small"
+            variant="text"
+            @click="item._show = !item._show"
+            :ripple="false"
           >
-            <v-icon start>mdi-information-outline</v-icon>
-            Detalhes
+            <v-icon start size="16">mdi-chevron-down</v-icon>
+            Cotações
           </v-btn>
-        </div>
-      </v-card-title>
+        </template>
 
-      <v-card-text class="pt-0">
-        <!-- Endereços -->
-        <v-row class="mt-1">
-          <v-col cols="12" sm="6">
-            <div class="text-caption text-medium-emphasis">Origem</div>
-            <div class="text-body-2">
-              CEP: {{ frete.cepOrigem || '—' }}
-            </div>
-          </v-col>
-          <v-col cols="12" sm="6">
-            <div class="text-caption text-medium-emphasis">Destino</div>
-            <div class="text-body-2">
-               CEP: {{ frete.cepDestino || '—' }}
-            </div>
-          </v-col>
-        </v-row>
+        <!-- Linha expandida: lista cotações -->
+        <template #expanded-row="{ columns, item }">
+          <td :colspan="columns.length" class="pa-3">
+            <div class="text-subtitle-2 mb-2">Cotações vinculadas</div>
+            <v-alert v-if="!Array.isArray(item.cotacoes) || !item.cotacoes.length" type="info" variant="tonal">
+              Nenhuma cotação registrada.
+            </v-alert>
 
-        <!-- Produtos -->
-        <div class="mt-4">
-          <div class="text-subtitle-2 mb-2">Produtos</div>
-          <v-list density="compact" class="rounded">
-            <v-list-item
-              v-for="(p, i) in (frete.produtos || [])"
-              :key="i"
-              :title="p.nome || ('Produto ' + (i+1))"
-              :subtitle="`${p.quantidade || 1}x ${p.peso || 0} g — ${p.largura || 0}x${p.altura || 0}x${p.comprimento || 0} cm`"
-            >
-              <template #prepend>
-                <v-icon>mdi-package-variant-closed</v-icon>
-              </template>
-            </v-list-item>
-            <v-list-item v-if="!(frete.produtos?.length)">
-              <v-list-item-title>Nenhum produto informado</v-list-item-title>
-            </v-list-item>
-          </v-list>
-        </div>
+            <v-table v-else density="compact" class="border">
+              <thead>
+                <tr>
+                  <th style="width: 220px;">ID / Serviço</th>
+                  <th style="width: 180px;">Transportadora</th>
+                  <th style="width: 120px;">Valor</th>
+                  <th style="width: 100px;">Prazo</th>
+                  <th style="width: 160px;" class="text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="c in item.cotacoes" :key="String(c.cotacaoId)">
+                  <td>
+                    <div class="text-caption">
+                      <strong>{{ c.cotacaoId || c.id || '—' }}</strong><br />
+                      <span class="text-grey">{{ c.service || '—' }}</span>
+                    </div>
+                  </td>
+                  <td>{{ c.carrier || '—' }}</td>
+                  <td>{{ formatCurrency(c.valor ?? c.price ?? 0) }}</td>
+                  <td>
+                    <span v-if="Number.isFinite(Number(c.prazo)) && Number(c.prazo) > 0">
+                      {{ Number(c.prazo) }} dia(s)
+                    </span>
+                    <span v-else>—</span>
+                  </td>
+                  <td class="text-right">
+                    <v-btn
+                      size="x-small"
+                      variant="text"
+                      color="error"
+                      :loading="busyId === `cancelCot:${item._id}:${c.cotacaoId}`"
+                      @click="cancelarCotacao(item, c.cotacaoId)"
+                      :ripple="false"
+                    >
+                      <v-icon start size="16">mdi-close</v-icon> Remover
+                    </v-btn>
+                  </td>
+                </tr>
+              </tbody>
+            </v-table>
+          </td>
+        </template>
 
-        <!-- Cotações -->
-        <div class="mt-4">
-          <div class="d-flex align-center justify-space-between mb-2">
-            <div class="text-subtitle-2">Cotações ({{ frete.cotacoes?.length || 0 }})</div>
-            <v-chip
-              v-if="frete.cotacaoSelecionada"
-              color="teal"
-              size="small"
-              text-color="white"
-              variant="elevated"
-            >
-              Selecionada: {{ frete.cotacaoSelecionada.carrier }} (R$ {{ frete.cotacaoSelecionada.valor }})
-            </v-chip>
-          </div>
-
-          <v-list density="compact" class="rounded">
-            <v-list-item
-              v-for="cot in (frete.cotacoes || [])"
-              :key="cot.id"
-            >
-              <template #prepend>
-                <v-avatar size="28">
-                  <v-icon>mdi-truck-fast</v-icon>
-                </v-avatar>
-              </template>
-
-              <v-list-item-title>
-                <strong>{{ cot.carrier }}</strong> — {{ cot.service }}
-              </v-list-item-title>
-              <v-list-item-subtitle>
-                Valor: R$ {{ cot.valor }} • Prazo: {{ cot.prazo }} dia(s)
-              </v-list-item-subtitle>
-
-              <template #append>
-  <div class="d-flex ga-2">
-    <v-btn
-      size="x-small"
-      color="success"
-      :disabled="frete.cotacaoSelecionada?._id === cot._id"
-      @click="selecionarCotacao(frete._id, cot._id)"
-    >
-      Selecionar
-    </v-btn>
-    <v-btn
-      size="x-small"
-      color="error"
-      @click="cancelarCotacao(frete._id, cot._id)"
-    >
-      Cancelar
-    </v-btn>
-  </div>
-</template>
-
-            </v-list-item>
-
-            <v-list-item v-if="!(frete.cotacoes?.length)">
-              <v-list-item-title>Nenhuma cotação registrada</v-list-item-title>
-            </v-list-item>
-          </v-list>
-        </div>
-
-        <!-- Detalhes -->
-        <v-expand-transition>
-          <div v-show="frete._showDetalhes" class="mt-4">
-            <v-divider class="mb-3" />
-            <div class="text-subtitle-2 mb-1">Detalhes</div>
-            <div class="text-body-2">
-              <div><strong>Criado em:</strong> {{ formatDate(frete.createdAt) }}</div>
-              <div v-if="frete.etiquetaId">
-                <strong>Etiqueta:</strong>
-                <v-btn small text color="primary" @click="abrirEtiqueta(frete)">
-                  Abrir Etiqueta
-                </v-btn>
-                <div class="text-caption">{{ frete.etiquetaUrl }}</div>
-              </div>
-              <div><strong>Atualizado em:</strong> {{ formatDate(frete.updatedAt) }}</div>
-              <div><strong>Usuário:</strong> {{ frete.usuario || '—' }}</div>
-            </div>
-          </div>
-        </v-expand-transition>
-      </v-card-text>
-
-      <!-- Ações Mobile -->
-      <v-card-actions class="d-flex d-sm-none ga-2">
-        <v-btn
-  v-if="!frete.etiqueta"
-  size="small"
-  color="primary"
-  :disabled="!frete.cotacaoSelecionada || freteStore.loading"
-  @click="gerarEtiqueta(frete._id.toString(), frete.cotacaoSelecionada?._id?.toString())"
-
->
-  <v-icon start>mdi-label-outline</v-icon>
-  Gerar Etiqueta
-</v-btn>
-
-
-        <v-btn
-  v-else
-  size="small"
-  color="success"
-  @click="abrirEtiqueta(frete)"
->
-  <v-icon start>mdi-open-in-new</v-icon>
-  Abrir Etiqueta
-</v-btn>
-
-
-        <v-btn
-          size="small"
-          color="error"
-          @click="cancelarFrete(frete._id)"
-        >
-          <v-icon start>mdi-cancel</v-icon>
-          Cancelar Frete
-        </v-btn>
-
-        <v-btn
-          size="small"
-          color="info"
-          @click="frete._showDetalhes = !frete._showDetalhes"
-        >
-          <v-icon start>mdi-information-outline</v-icon>
-          Detalhes
-        </v-btn>
-      </v-card-actions>
+      </v-data-table>
     </v-card>
 
-    <v-alert v-if="!freteStore.fretes.length && !freteStore.loading" type="info" variant="tonal">
-      Nenhum frete encontrado. Crie sua primeira cotação no botão acima.
-    </v-alert>
-
-    <!-- Diálogo Criar Cotação -->
-    <v-dialog v-model="dialogCriar" max-width="700">
-      <v-card>
-        <h2 class="mb-6">Simulação de Frete (Teste Automático)</h2>
-
-        <v-btn color="info" class="mb-4" @click="preencherTeste">
-          Preencher formulário de teste
-        </v-btn>
-
-        <v-form v-model="formValido" @submit.prevent="enviarCotacao">
-          <!-- Campos e Produtos -->
-          <v-row>
-            <v-col cols="12" sm="6">
-              <v-text-field v-model="cotacao.cepOrigem" label="CEP Origem" placeholder="00000-000" :rules="[v => !!v || 'CEP obrigatório']" required/>
-            </v-col>
-            <v-col cols="12" sm="6">
-              <v-text-field v-model="cotacao.cepDestino" label="CEP Destino" placeholder="00000-000" :rules="[v => !!v || 'CEP obrigatório']" required/>
-            </v-col>
-          </v-row>
-
-          <v-card class="pa-4 my-4">
-            <h3 class="mb-3">Produtos</h3>
-            <v-row>
-              <v-col cols="12" sm="6" md="4">
-                <v-text-field v-model="produto.nome" label="Nome" />
-              </v-col>
-              <v-col cols="12" sm="6" md="2">
-                <v-text-field v-model.number="produto.peso" label="Peso (g)" type="number" min="1" />
-              </v-col>
-              <v-col cols="12" sm="6" md="2">
-                <v-text-field v-model.number="produto.quantidade" label="Qtd" type="number" min="1" />
-              </v-col>
-              <v-col cols="12" sm="6" md="2">
-                <v-text-field v-model.number="produto.altura" label="Altura (cm)" type="number" min="1" />
-              </v-col>
-              <v-col cols="12" sm="6" md="2">
-                <v-text-field v-model.number="produto.largura" label="Largura (cm)" type="number" min="1" />
-              </v-col>
-              <v-col cols="12" sm="6" md="2">
-                <v-text-field v-model.number="produto.comprimento" label="Comprimento (cm)" type="number" min="1" />
-              </v-col>
-            </v-row>
-
-            <v-btn color="primary" class="mt-3" @click="adicionarProduto" :disabled="!produto.nome || !produto.peso">
-              Adicionar Produto
-            </v-btn>
-
-            <v-list v-if="cotacao.produtos.length" class="mt-4">
-              <v-list-item v-for="(p, i) in cotacao.produtos" :key="i">
-                <v-list-item-title>
-                  {{ p.nome }} - {{ p.quantidade }}x ({{ p.peso }} g)
-                  [{{ p.altura }}x{{ p.largura }}x{{ p.comprimento }} cm]
-                </v-list-item-title>
-                <template #append>
-                  <v-btn icon @click="removerProduto(i)">
-                    <v-icon>mdi-delete</v-icon>
-                  </v-btn>
-                </template>
-              </v-list-item>
-            </v-list>
-          </v-card>
-
-          <!-- Opções de envio -->
-          <v-card class="pa-4 my-4">
-            <h3 class="mb-3">Opções de Envio</h3>
-            <v-text-field v-model="cotacao.services" label="Serviços (ex: 1,2,17)" />
-            <v-checkbox v-model="cotacao.options.own_hand" label="Mão própria" />
-            <v-checkbox v-model="cotacao.options.receipt" label="Aviso de recebimento" />
-            <v-text-field v-model.number="cotacao.options.insurance_value" label="Valor do seguro" type="number" min="0" />
-          </v-card>
-
-          <v-btn type="submit" color="success" :loading="freteStore.carregando" :disabled="!formValido || !cotacao.produtos.length">
-            Criar Cotação
-          </v-btn>
-        </v-form>
-
-        <v-card v-if="resultado" class="mt-6 pa-4">
-          <h3>Resultado da Cotação</h3>
-          <pre>{{ resultado }}</pre>
-        </v-card>
-
-        <v-alert v-if="freteStore.erro" type="error" class="mt-4">
-          {{ freteStore.erro }}
-        </v-alert>
-      </v-card>
-    </v-dialog>
-</v-container>
+    <v-snackbar v-model="snackbar.visible" :timeout="3500" :color="snackbar.color" top right>
+      <v-icon start>{{ snackbar.color === 'red' ? 'mdi-alert' : 'mdi-check-circle' }}</v-icon>
+      {{ snackbar.message }}
+    </v-snackbar>
+  </v-container>
 </template>
 
-
 <script setup>
+import { ref, computed, onMounted } from 'vue'
+import axios from 'axios'
 
-import { ref, reactive, onMounted } from 'vue'
-import { useFreteStore } from '@/store/freteStore'
+const API = 'https://backendgeral-147424face7e.herokuapp.com'
+const token = localStorage.getItem('token')
 
-const freteStore = useFreteStore()
-const formValido = ref(false)
-const resultado = ref(null)
+const loading = ref(false)
+const errorMsg = ref('')
+const items = ref([])
+const q = ref('')
+const busyId = ref(null)
 
-// Cotação
-const cotacao = reactive({
-  cepOrigem: "",
-  cepDestino: "",
-  produtos: [],
-  services: "1,2,17",
-  options: {
-    own_hand: false,
-    receipt: false,
-    insurance_value: 0,
-    use_insurance_value: false
-  }
+const snackbar = ref({ visible: false, message: '', color: 'success' })
+
+const headers = [
+  { title: 'Frete', key: '_id', sortable: false },
+  { title: 'Usuário', key: 'usuario', sortable: false },
+  { title: 'Serviço', key: 'service', sortable: false },
+  { title: 'Valor', key: 'valor', sortable: false },
+  { title: 'Prazo', key: 'prazo', sortable: false },
+  { title: 'Status', key: 'status', sortable: false },
+  { title: 'Criado em', key: 'createdAt', sortable: true },
+  { title: 'Ações', key: 'actions', sortable: false },
+]
+
+const filtered = computed(() => {
+  const text = (q.value || '').toLowerCase().trim()
+  if (!text) return items.value
+  return items.value.filter(f =>
+    f._id?.toLowerCase().includes(text) ||
+    f.pedidoId?.toLowerCase?.().includes(text) ||
+    f.usuario?.nome?.toLowerCase?.().includes(text) ||
+    f.usuario?.email?.toLowerCase?.().includes(text) ||
+    f?.cotacaoSelecionada?.carrier?.toLowerCase?.().includes(text) ||
+    f?.cotacaoSelecionada?.service?.toLowerCase?.().includes(text)
+  )
 })
 
-// Produto temporário para adicionar à cotação
-const produto = reactive({
-  nome: "",
-  peso: null,
-  quantidade: 1,
-  altura: null,
-  largura: null,
-  comprimento: null
-})
-
-// Diálogo
-const dialogCriar = ref(false)
-
-// --- Funções Cotação ---
-function adicionarProduto() {
-  if (!produto.nome || !produto.peso) return
-  cotacao.produtos.push({ ...produto })
-  Object.assign(produto, { nome: "", peso: null, quantidade: 1, altura: null, largura: null, comprimento: null })
+function formatCurrency(v) {
+  return (Number(v) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 }
-
-function removerProduto(index) {
-  cotacao.produtos.splice(index, 1)
-}
-
-function preencherTeste() {
-  cotacao.cepOrigem = "09351080"
-  cotacao.cepDestino = "09541360"
-  cotacao.services = "1,2,17"
-  cotacao.options.own_hand = false
-  cotacao.options.receipt = false
-  cotacao.options.insurance_value = 50
-  cotacao.options.use_insurance_value = true
-
-  cotacao.produtos = [
-    { nome: "Camisetas", peso: 500, quantidade: 2, altura: 20, largura: 20, comprimento: 10 },
-    { nome: "Tênis", peso: 800, quantidade: 1, altura: 30, largura: 25, comprimento: 35 }
-  ]
-
-  // Endereços de teste
-  cotacao.enderecoOrigem = {
-    nome: "Loja Teste",
-    endereco: "Rua A",
-    numero: "123",
-    bairro: "Centro",
-    cidade: "Mauá",
-    estado: "SP",
-    cep: "09351080",
-    cpfCnpj: "12345678900"
-  }
-  cotacao.enderecoDestino = {
-    nome: "João da Silva",
-    endereco: "Rua B",
-    numero: "456",
-    bairro: "Jardim",
-    cidade: "São Caetano",
-    estado: "SP",
-    cep: "09541360",
-    cpfCnpj: "98765432100"
-  }
-}
-
-
-async function enviarCotacao() {
-  if (!cotacao.produtos.length) return
-
-  try {
-    const data = await freteStore.criarCotacao(cotacao)
-    if (data) resultado.value = data
-  } catch (err) {
-    console.error("Erro ao enviar cotação:", err)
-  }
-}
-
-// --- Funções Frete ---
-async function listarFretes() {
-  await freteStore.listarTodosFretes()
-}
-
-async function selecionarCotacao(freteId, cotacaoId) {
-  await freteStore.selecionarCotacao(freteId, cotacaoId)
-  await listarFretes()
-}
-
-async function gerarEtiqueta(freteId, cotacaoId) {
-  const etiqueta = await freteStore.gerarEtiqueta(freteId, cotacaoId)
-  if (etiqueta?.url || etiqueta?.etiquetaUrl) {
-    window.open(etiqueta.url || etiqueta.etiquetaUrl, "_blank")
-  }
-}
-
-
-function abrirEtiqueta(frete) {
-  if (frete.etiquetaUrl) window.open(frete.etiquetaUrl, "_blank")
-}
-
-async function cancelarFrete(freteId) {
-  await freteStore.cancelarFrete(freteId)
-  await listarFretes()
-}
-
-async function cancelarCotacao(freteId, cotacaoId) {
-  await freteStore.cancelarCotacao(freteId, cotacaoId)
-  await listarFretes()
-}
-
-// --- Helpers ---
-function statusColor(status) {
-  switch (status) {
-    case 'etiqueta_gerada': return 'green'
-    case 'cancelado': return 'red'
-    case 'pendente': return 'orange'
-    default: return 'blue'
-  }
-}
-
 function formatDate(d) {
-  if (!d) return '—'
-  try { return new Date(d).toLocaleString() } catch { return d }
+  try { return new Date(d).toLocaleString('pt-BR') } catch { return '' }
 }
 
-// --- On Mounted ---
-onMounted(async () => {
-  await listarFretes()
-  console.log('FRETES:', JSON.parse(JSON.stringify(freteStore.fretes)))
-})
+async function fetchFretes() {
+  try {
+    loading.value = true
+    errorMsg.value = ''
+    const { data } = await axios.get(`${API}/frete/listar`, {
+      headers: { Authorization: 'Bearer ' + token }
+    })
+    // garante flag de expand
+    items.value = (Array.isArray(data) ? data : []).map(x => ({ ...x, _show: false }))
+  } catch (e) {
+    console.error('[fretes] listar erro:', e)
+    errorMsg.value = e?.response?.data?.erro || e?.message || 'Erro ao listar fretes'
+  } finally {
+    loading.value = false
+  }
+}
+
+async function imprimir(item) {
+  try {
+    busyId.value = 'print:' + item._id
+    const { data } = await axios.get(`${API}/frete/imprimir/${item._id}`, {
+      headers: { Authorization: 'Bearer ' + token }
+    })
+
+    const url = data?.urlImpressao
+    const pdfBase64 = data?.pdfBase64
+
+    if (url) {
+      window.open(url, '_blank')
+      snackbar.value = { visible: true, message: 'Link de impressão aberto em nova aba.', color: 'success' }
+      return
+    }
+
+    if (pdfBase64) {
+      // abre o base64 em um Blob PDF
+      const byteChars = atob(pdfBase64)
+      const byteNumbers = new Array(byteChars.length)
+      for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i)
+      const byteArray = new Uint8Array(byteNumbers)
+      const blob = new Blob([byteArray], { type: 'application/pdf' })
+      const blobUrl = URL.createObjectURL(blob)
+      window.open(blobUrl, '_blank')
+      snackbar.value = { visible: true, message: 'PDF aberto em nova aba.', color: 'success' }
+      return
+    }
+
+    // Sem URL nem PDF
+    snackbar.value = { visible: true, message: 'A API não retornou link nem PDF para impressão.', color: 'red' }
+  } catch (e) {
+    console.error('[fretes] imprimir erro:', e?.response?.data || e)
+    const msg = e?.response?.data?.error || e?.response?.data?.erro || 'Erro ao gerar link de impressão'
+    snackbar.value = { visible: true, message: msg, color: 'red' }
+  } finally {
+    busyId.value = null
+  }
+}
+
+
+async function cancelar(item) {
+  const ok = confirm(`Cancelar o frete ${item._id}? Essa ação não pode ser desfeita.`)
+  if (!ok) return
+  try {
+    busyId.value = 'cancel:' + item._id
+    const { data } = await axios.post(`${API}/frete/cancelar/${item._id}`, {}, {
+      headers: { Authorization: 'Bearer ' + token }
+    })
+    snackbar.value = { visible: true, message: data?.mensagem || 'Frete cancelado.', color: 'success' }
+    await fetchFretes()
+  } catch (e) {
+    console.error('[fretes] cancelar erro:', e?.response?.data || e)
+    const msg = e?.response?.data?.erro || 'Erro ao cancelar frete'
+    snackbar.value = { visible: true, message: msg, color: 'red' }
+  } finally {
+    busyId.value = null
+  }
+}
+
+async function cancelarCotacao(item, cotacaoId) {
+  const ok = confirm(`Remover cotação ${cotacaoId} do frete ${item._id}?`)
+  if (!ok) return
+  try {
+    busyId.value = `cancelCot:${item._id}:${cotacaoId}`
+    const { data } = await axios.post(
+      `${API}/frete/cancelar-cotacao/${item._id}/${cotacaoId}`,
+      {},
+      { headers: { Authorization: 'Bearer ' + token } }
+    )
+    snackbar.value = { visible: true, message: data?.mensagem || 'Cotação removida.', color: 'success' }
+    // atualiza apenas o item alterado para evitar full reload:
+    const idx = items.value.findIndex(f => f._id === item._id)
+    if (idx >= 0) {
+      items.value[idx] = { ...items.value[idx], cotacoes: data?.cotacoes || [] }
+    }
+  } catch (e) {
+    console.error('[fretes] cancelar cotação erro:', e?.response?.data || e)
+    const msg = e?.response?.data?.erro || 'Erro ao cancelar cotação'
+    snackbar.value = { visible: true, message: msg, color: 'red' }
+  } finally {
+    busyId.value = null
+  }
+}
+
+onMounted(fetchFretes)
 </script>
+
+<style scoped>
+.border { border: 1px solid #E0E0E0; border-radius: 6px; }
+</style>

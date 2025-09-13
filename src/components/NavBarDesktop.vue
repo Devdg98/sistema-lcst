@@ -2,7 +2,7 @@
   <v-navigation-drawer
     app
     permanent
-    :style="{ backgroundColor: '#002D18' }"
+    :style="{ backgroundColor: '#000000' }"
     width="300"
   >
     <div class="text-center my-6">
