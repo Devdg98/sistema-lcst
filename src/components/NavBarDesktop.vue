@@ -1,7 +1,7 @@
 <template>
   <v-navigation-drawer
     app
-    permanent
+    
     :style="{ backgroundColor: '#000000' }"
     width="300"
   >
