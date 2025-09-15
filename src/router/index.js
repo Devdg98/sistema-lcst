@@ -260,7 +260,10 @@ const routes = [
     path: '/estoqueGerencial',
     component:() => import('@/views/Gerencial/estoqueGerencial.vue')
 },
-
+{
+    path: '/gestaoNovidades',
+    component:() => import('@/views/Gerencial/editNovidades.vue')
+},
 {
     path: '/gestaoExpedicao',
     component:() => import('@/views/Gerencial/entregaGerencial.vue')
